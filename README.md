@@ -21,7 +21,8 @@
 原 App 的程序、图标、资源、名称及其他第三方内容的权利仍属于各自权利人。
 请支持原作者，从官方渠道获取原应用，并遵守原应用和相关网站的使用条款。
 
-**本仓库不分发原始或重打包 APK，也不包含签名私钥、账号、API 密钥、测试日志或个人数据。**
+**源码仓库不包含原始 APK；电视适配安装包通过 [GitHub Releases](https://github.com/TheElderFrog/TWS-TV/releases) 单独发布。**
+签名私钥、账号、API 密钥、测试日志及个人数据不公开。
 版权说明与第三方依赖见 [NOTICE.md](NOTICE.md)。
 
 ## 电视适配
@@ -52,8 +53,15 @@
 
 ## 获取与安装
 
-目前公开的是适配代码与补丁，**没有公开 APK 下载**。需要自行构建并侧载。
-构建结果为 `dist/TWS-TV.apk`，可通过电视安装器或已授权的 ADB 安装：
+从 **[最新版本下载](https://github.com/TheElderFrog/TWS-TV/releases/latest)** 获取 `TWS-TV.apk`，
+通过电视安装器或已授权的 ADB 安装；也可以按下文自行构建。
+
+当前版本：**beta-4.16.4-tv4 / 176**，需要 Android 7.0 或更高版本。
+安装包 SHA256：
+
+```text
+9e8b012e09b833efdebc303cc9fede098459053862560a5b9a10b9c3c96e6dcd
+```
 
 ```powershell
 adb install -r .\dist\TWS-TV.apk
