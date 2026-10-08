@@ -9,6 +9,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $project = $PSScriptRoot
 if (!$JavaHome) { throw 'Set JAVA_HOME or supply -JavaHome.' }
+$env:JAVA_HOME = $JavaHome
 if (!$Sdk) { $Sdk = Join-Path $env:LOCALAPPDATA 'Android\Sdk' }
 if (!$env:TWS_TV_KEYSTORE_PASSWORD) { throw 'Set TWS_TV_KEYSTORE_PASSWORD to your own local signing password.' }
 $java = Join-Path $JavaHome 'bin\java.exe'
