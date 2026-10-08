@@ -1,0 +1,17 @@
+/original.apk
+/base.apk
+/dist/
+/tools/
+*.apk
+*.keystore
+*.jks
+*.pem
+*.p12
+.env
+.env.*
+local.properties
+__pycache__/
+*.pyc
+hs_err_pid*.log
+replay_pid*.log
+*.log
