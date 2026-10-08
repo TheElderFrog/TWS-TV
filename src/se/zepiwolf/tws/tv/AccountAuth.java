@@ -21,19 +21,20 @@ final class AccountAuth {
     private static final String HOST = "https://e621.net";
     private final CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ORIGINAL_SERVER);
     static final class Failure extends Exception {
-        Failure(String message) { super(message); }
+        final Object[] args;
+        Failure(String key, Object... args) { super(key); this.args = args; }
     }
     static final class Reply {
         final int code; final String body;
         Reply(int code, String body) { this.code = code; this.body = body; }
     }
     String authenticate(String username, String secret, boolean apiMode) throws Exception {
-        if (username.isEmpty() || username.length() > 30 || username.contains(":")) throw new Failure("请输入有效的用户名");
-        if (secret.isEmpty()) throw new Failure(apiMode ? "请输入 API 密钥" : "请输入密码");
+        if (username.isEmpty() || username.length() > 30 || username.contains(":")) throw new Failure("tv_invalid_username");
+        if (secret.isEmpty()) throw new Failure(apiMode ? "tv_enter_api" : "tv_enter_password");
         String key = apiMode ? secret : fetchKey(username, secret);
         String basic = Base64.encodeToString((username + ":" + key).getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
         Reply check = request("/favorites.json?limit=1", null, null, "Basic " + basic);
-        if (check.code == 401 || check.code == 403) throw new Failure("账号或 API 密钥验证失败");
+        if (check.code == 401 || check.code == 403) throw new Failure("tv_auth_failed");
         require(check);
         new JSONObject(check.body).getJSONArray("posts");
         return key;
@@ -42,13 +43,13 @@ final class AccountAuth {
         // The JSON variant returns an HTML error page with the session's CSRF meta tag.
         Reply page = request("/session/new.json", null, null, null);
         Element token = Jsoup.parse(page.body).selectFirst("meta[name=csrf-token]");
-        if (token == null) throw new Failure("网站要求浏览器验证，请使用 API 密钥登录");
+        if (token == null) throw new Failure("tv_browser_required");
         String csrf = token.attr("content");
         Reply login = request("/session.json", "session[name]=" + encode(username) + "&session[password]=" + encode(password) + "&session[remember]=0", csrf, null);
         if (login.code == 401) {
             JSONObject error = new JSONObject(login.body);
-            if ("totp_required".equals(error.optString("code"))) throw new Failure("账号启用了两步验证，请在网站获取 API 密钥后登录");
-            throw new Failure("用户名或密码不正确");
+            if ("totp_required".equals(error.optString("code"))) throw new Failure("tv_totp_required");
+            throw new Failure("tv_wrong_password");
         }
         require(login);
         Reply keys = request("/api_keys.json", null, null, null);
@@ -71,13 +72,13 @@ final class AccountAuth {
         Reply created = request("/api_keys.json", "api_key[name]=TWS-TV-" + System.currentTimeMillis() + "&api_key[duration]=never", csrf, null);
         require(created);
         String key = new JSONObject(created.body).optString("key");
-        if (key.isEmpty()) throw new Failure("无法创建 API 密钥，请在网站管理 API 权限");
+        if (key.isEmpty()) throw new Failure("tv_create_api_error");
         return key;
     }
     private static String encode(String text) throws Exception { return URLEncoder.encode(text, "UTF-8"); }
     private static void require(Reply reply) throws Failure {
-        if (reply.code == 429) throw new Failure("网站限制了请求频率，请稍后再试");
-        if (reply.code < 200 || reply.code >= 300) throw new Failure("网站请求失败 (HTTP " + reply.code + ")，可切换 API 密钥登录");
+        if (reply.code == 429) throw new Failure("tv_rate_limit");
+        if (reply.code < 200 || reply.code >= 300) throw new Failure("tv_http_error", reply.code);
     }
     private Reply request(String path, String body, String csrf, String auth) throws Exception {
         URL url = new URL(HOST + path);
@@ -108,7 +109,7 @@ final class AccountAuth {
         try (InputStream stream = input; ByteArrayOutputStream result = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[4096]; int count;
             while ((count = stream.read(buffer)) != -1) {
-                if (result.size() + count > limit) throw new Failure("服务器返回的数据过大");
+                if (result.size() + count > limit) throw new Failure("tv_response_large");
                 result.write(buffer, 0, count);
             }
             return new String(result.toByteArray(), StandardCharsets.UTF_8);

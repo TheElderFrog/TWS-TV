@@ -181,8 +181,10 @@ final class TvViewer {
             Drawable drawable = ((ImageView) original).getDrawable();
             if (drawable != null && drawable.getConstantState() != null)
                 playButton.setImageDrawable(drawable.getConstantState().newDrawable(activity.getResources()));
-            playButton.setContentDescription(original.getContentDescription());
-            playButton.setTooltipText(original.getContentDescription());
+            int pause = activity.getResources().getIdentifier("exo_controls_pause_description", "string", activity.getPackageName());
+            boolean playing = pause != 0 && activity.getString(pause).contentEquals(original.getContentDescription() == null ? "" : original.getContentDescription());
+            String label = TvStrings.text(activity, playing ? "tv_pause" : "tv_play");
+            playButton.setContentDescription(label); playButton.setTooltipText(label);
         }
     }
     void focusMedia() { View view = media(); if (view != null) view.requestFocus(); }
@@ -217,18 +219,18 @@ final class TvViewer {
             time = new TextView(activity); time.setTextColor(0xffeeeeee); time.setTextSize(16);
             time.setGravity(Gravity.CENTER); time.setFocusable(false);
             transport.addView(time, new LinearLayout.LayoutParams(dp(activity, 144), -1));
-            button("快退", android.R.drawable.ic_media_rew, () -> mediaAction(KeyEvent.KEYCODE_MEDIA_REWIND));
-            playButton = button("播放 / 暂停", drawable("ic_baseline_play_circle_outline_24"), () -> mediaAction(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
-            button("快进", android.R.drawable.ic_media_ff, () -> mediaAction(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD));
+            button(TvStrings.text(activity, "tv_rewind"), android.R.drawable.ic_media_rew, () -> mediaAction(KeyEvent.KEYCODE_MEDIA_REWIND));
+            playButton = button(TvStrings.text(activity, "tv_play_pause"), drawable("ic_baseline_play_circle_outline_24"), () -> mediaAction(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
+            button(TvStrings.text(activity, "tv_fast_forward"), android.R.drawable.ic_media_ff, () -> mediaAction(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD));
             if (any("btnUnmute") != null)
-                button("开启声音", drawable("ic_baseline_volume_up_24"), () -> { View mute = any("btnUnmute"); if (mute != null) mute.performClick(); });
+                button(TvStrings.text(activity, "tv_unmute"), drawable("ic_baseline_volume_up_24"), () -> { View mute = any("btnUnmute"); if (mute != null) mute.performClick(); });
         } else {
-            button("上一张", android.R.drawable.ic_media_previous, () -> actions.page(-1));
-            button("下一张", android.R.drawable.ic_media_next, () -> actions.page(1));
-            button("放大图片", android.R.drawable.ic_menu_zoom, () -> { hideTransport(); actions.zoom(); });
+            button(TvStrings.text(activity, "tv_previous_image"), android.R.drawable.ic_media_previous, () -> actions.page(-1));
+            button(TvStrings.text(activity, "tv_next_image"), android.R.drawable.ic_media_next, () -> actions.page(1));
+            button(TvStrings.text(activity, "tv_zoom_in"), android.R.drawable.ic_menu_zoom, () -> { hideTransport(); actions.zoom(); });
         }
-        button("退出全屏", drawable("ic_fullscreen"), () -> toggleFullscreen());
-        button("作品详情", android.R.drawable.ic_menu_info_details, () -> {
+        button(TvStrings.text(activity, "tv_exit_fullscreen"), drawable("ic_fullscreen"), () -> toggleFullscreen());
+        button(TvStrings.text(activity, "tv_details"), android.R.drawable.ic_menu_info_details, () -> {
             toggleFullscreen(); root.postDelayed(() -> focusDetails(), 250);
         });
     }

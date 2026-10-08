@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="se.zepiwolf.tws.tv.localetest">
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="27" />
+    <uses-permission android:name="android.permission.CHANGE_CONFIGURATION" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <application android:label="TWS TV Locale Test" />
+    <instrumentation android:name="se.zepiwolf.tws.tv.localetest.LocaleTest" android:targetPackage="se.zepiwolf.tws.tv.localetest" />
+</manifest>

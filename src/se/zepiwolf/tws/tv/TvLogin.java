@@ -60,29 +60,29 @@ final class TvLogin {
         panel.setGravity(Gravity.CENTER);
         panel.setPadding(dp(40), dp(16), dp(40), dp(16));
         panel.setBackgroundColor(0xff0d151e);
-        TextView title = text("账号登录", 26); panel.addView(title);
-        username = new EditText(activity); username.setHint("用户名");
+        TextView title = text(TvStrings.text(activity, "tv_login_title"), 26); panel.addView(title);
+        username = new EditText(activity); username.setHint(TvStrings.text(activity, "tv_username"));
         username.setSingleLine(true); username.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PERSON_NAME);
-        secret = new EditText(activity); secret.setHint("密码");
+        secret = new EditText(activity); secret.setHint(TvStrings.text(activity, "tv_password"));
         secret.setSingleLine(true); secret.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         for (EditText field : new EditText[]{username, secret}) {
             field.setTextColor(Color.WHITE); field.setTextSize(20); field.setShowSoftInputOnFocus(false);
             panel.addView(field, new LinearLayout.LayoutParams(dp(440), dp(62)));
         }
         LinearLayout actions = new LinearLayout(activity); actions.setGravity(Gravity.CENTER);
-        submit = button("登录", () -> submitNative()); actions.addView(submit);
-        phone = button("手机扫码", () -> showPairing()); actions.addView(phone);
-        mode = button("使用 API 密钥", () -> toggleMode()); actions.addView(mode);
+        submit = button(TvStrings.text(activity, "tv_login"), () -> submitNative()); actions.addView(submit);
+        phone = button(TvStrings.text(activity, "tv_scan"), () -> showPairing()); actions.addView(phone);
+        mode = button(TvStrings.text(activity, "tv_use_api"), () -> toggleMode()); actions.addView(mode);
         panel.addView(actions);
         status = text("", 17); panel.addView(status);
-        panel.addView(button("返回", () -> activity.finish()), new LinearLayout.LayoutParams(dp(140), dp(48)));
+        panel.addView(button(TvStrings.text(activity, "tv_back"), () -> activity.finish()), new LinearLayout.LayoutParams(dp(140), dp(48)));
         root.addView(panel, new ViewGroup.LayoutParams(-1, -1));
         phone.requestFocus();
     }
     void toggleMode() {
             apiMode = !apiMode; secret.setText("");
-            secret.setHint(apiMode ? "API 密钥" : "密码");
-            mode.setText(apiMode ? "使用账号密码" : "使用 API 密钥");
+            secret.setHint(apiMode ? TvStrings.text(activity, "tv_api_key") : TvStrings.text(activity, "tv_password"));
+            mode.setText(apiMode ? TvStrings.text(activity, "tv_use_password") : TvStrings.text(activity, "tv_use_api"));
     }
     int dp(int n) { return Math.round(n * activity.getResources().getDisplayMetrics().density); }
     TextView text(String value, int size) {
@@ -101,22 +101,24 @@ final class TvLogin {
         if (busy) return;
         String user = username.getText().toString().trim(), credential = secret.getText().toString();
         final boolean api = apiMode;
-        secret.setText(""); setBusy(true); status.setText("正在验证账号…");
+        secret.setText(""); setBusy(true); status.setText(TvStrings.text(activity, "tv_verifying"));
         worker.execute(() -> {
             try {
                 String key = new AccountAuth().authenticate(user, credential, api);
                 main.post(() -> {
                     if (closed || activity.isFinishing()) return;
                     try { commit(user, key); }
-                    catch (Exception ex) { setBusy(false); status.setText("保存登录信息失败，请重试"); }
+                    catch (Exception ex) { setBusy(false); status.setText(TvStrings.text(activity, "tv_save_error")); }
                 });
             } catch (Exception ex) {
                 main.post(() -> { if (!closed) { setBusy(false); status.setText(message(ex)); } });
             }
         });
     }
-    static String message(Exception ex) {
-        return ex instanceof AccountAuth.Failure ? ex.getMessage() : "连接网站失败，请检查网络后重试";
+    String message(Exception ex) {
+        return ex instanceof AccountAuth.Failure
+            ? TvStrings.text(activity, ex.getMessage(), ((AccountAuth.Failure) ex).args)
+            : TvStrings.text(activity, "tv_network_error");
     }
     void commit(String user, String key) throws Exception {
         EditText originalUser = (EditText) activity.findViewById(resource("eTUsername"));
@@ -128,7 +130,7 @@ final class TvLogin {
     int resource(String name) { return activity.getResources().getIdentifier(name, "id", activity.getPackageName()); }
     void showPairing() {
         if (busy || pairing != null) return;
-        setBusy(true); status.setText("正在准备手机登录…");
+        setBusy(true); status.setText(TvStrings.text(activity, "tv_pair_preparing"));
         worker.execute(() -> {
             try {
                 Pairing created = new Pairing();
@@ -137,7 +139,7 @@ final class TvLogin {
                     setBusy(false); status.setText(""); pairing = created; created.show();
                 });
             } catch (Exception ex) {
-                main.post(() -> { if (!closed) { setBusy(false); status.setText("无法创建手机连接，请确认电视已连接局域网"); } });
+                main.post(() -> { if (!closed) { setBusy(false); status.setText(TvStrings.text(activity, "tv_pair_error")); } });
             }
         });
     }
@@ -150,7 +152,7 @@ final class TvLogin {
         final String host, url, crypto;
         volatile boolean stopped, completed;
         AlertDialog dialog;
-        final Runnable expiry = () -> { if (!stopped) { stop(); if (dialog != null) dialog.dismiss(); Toast.makeText(activity, "二维码已过期，请重新打开手机扫码", Toast.LENGTH_LONG).show(); } };
+        final Runnable expiry = () -> { if (!stopped) { stop(); if (dialog != null) dialog.dismiss(); Toast.makeText(activity, TvStrings.text(activity, "tv_pair_expired"), Toast.LENGTH_LONG).show(); } };
         Pairing() throws Exception {
             KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA"); generator.initialize(2048); keys = generator.generateKeyPair();
             InetAddress local = address();
@@ -184,8 +186,8 @@ final class TvLogin {
                 panel.addView(qr, new LinearLayout.LayoutParams(dp(208), dp(208)));
             } catch (Exception ignored) { }
             panel.addView(text(url, 16));
-            panel.addView(text("手机与电视连接同一网络，二维码 10 分钟内有效", 16));
-            dialog = new AlertDialog.Builder(activity).setTitle("手机登录").setView(panel).setNegativeButton("取消", null).create();
+            panel.addView(text(TvStrings.text(activity, "tv_pair_hint"), 16));
+            dialog = new AlertDialog.Builder(activity).setTitle(TvStrings.text(activity, "tv_phone_login")).setView(panel).setNegativeButton(TvStrings.text(activity, "tv_cancel"), null).create();
             dialog.setOnDismissListener(d -> { stop(); if (pairing == this) pairing = null; });
             dialog.show(); main.postDelayed(expiry, 10 * 60 * 1000);
             Thread thread = new Thread(() -> {
@@ -229,8 +231,8 @@ final class TvLogin {
                     finally { saved.countDown(); }
                 });
                 saved.await(5, TimeUnit.SECONDS);
-                if (!success[0]) throw new AccountAuth.Failure("二维码已关闭，请重新扫码");
-                reply(socket, 200, "application/json", new JSONObject().put("ok", true).put("message", "电视已登录，可以关闭本页").toString());
+                if (!success[0]) throw new AccountAuth.Failure("tv_pair_closed");
+                reply(socket, 200, "application/json", new JSONObject().put("ok", true).put("message", TvStrings.text(activity, "tv_login_done")).toString());
                 main.post(() -> { if (dialog != null) dialog.dismiss(); });
             } catch (Exception ex) {
                 reply(socket, 400, "application/json", new JSONObject().put("ok", false).put("message", message(ex)).toString());
@@ -255,17 +257,17 @@ final class TvLogin {
         }
         String page() {
             String publicKey = "-----BEGIN PUBLIC KEY-----\n" + Base64.encodeToString(keys.getPublic().getEncoded(), Base64.NO_WRAP) + "\n-----END PUBLIC KEY-----";
-            return "<!doctype html><html lang=zh-CN><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>TWS TV 登录</title>"
-                + "<style>*{box-sizing:border-box}body{margin:0;background:#0d151e;color:#fff;font:17px system-ui}main{max-width:480px;margin:auto;padding:24px}h1{font-size:26px}label{display:block;margin:18px 0 6px}input,select,button{width:100%;padding:14px;font:inherit;border-radius:6px;border:1px solid #526775;background:#17212c;color:white}button{margin-top:24px;background:#216378}a{color:#73e3ff}p{line-height:1.5}</style>"
-                + "<main><h1>TWS TV 登录</h1><label for=mode>登录方式</label><select id=mode><option value=password>账号密码</option><option value=api>API 密钥</option></select>"
-                + "<form id=form><label for=user>用户名</label><input id=user maxlength=30 autocomplete=username required><label id=secretLabel for=secret>密码</label><input id=secret type=password autocomplete=current-password required>"
-                + "<button id=submit>登录电视</button></form><p id=status role=status></p><p><a href='https://e621.net/api_keys' target=_blank rel=noopener>管理 API 密钥</a></p></main>"
-                + "<script src='" + path + "/crypto.js'></script><script>const mode=document.getElementById('mode'),secret=document.getElementById('secret'),user=document.getElementById('user'),button=document.getElementById('submit'),status=document.getElementById('status');"
-                + "mode.onchange=()=>{secret.value='';document.getElementById('secretLabel').textContent=mode.value==='api'?'API 密钥':'密码';secret.autocomplete=mode.value==='api'?'off':'current-password'};"
-                + "const rsa=new JSEncrypt();rsa.setPublicKey(" + JSONObject.quote(publicKey) + ");document.getElementById('form').onsubmit=async e=>{e.preventDefault();button.disabled=true;status.textContent='正在验证账号…';try{"
-                + "if(new TextEncoder().encode(user.value).length>200||new TextEncoder().encode(secret.value).length>200)throw Error('输入内容过长');const payload={user:rsa.encrypt(user.value),secret:rsa.encrypt(secret.value),mode:mode.value};secret.value='';if(!payload.user||!payload.secret)throw Error('加密失败，请重新打开二维码');"
-                + "const r=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}),data=await r.json();status.textContent=data.message;if(data.ok){document.getElementById('form').remove();mode.disabled=true}else button.disabled=false;"
-                + "}catch(e){status.textContent=e.message==='Failed to fetch'?'连接电视失败，请检查二维码是否仍打开':e.message;button.disabled=false}};</script></html>";
+            try {
+                JSONObject labels = new JSONObject();
+                for (String key : new String[]{"tv_web_title", "tv_login_method", "tv_account_password", "tv_api_key", "tv_username", "tv_password", "tv_login_tv", "tv_manage_api", "tv_verifying", "tv_input_long", "tv_encrypt_error", "tv_phone_network"})
+                    labels.put(key, TvStrings.text(activity, key));
+                String template = AccountAuth.read(activity.getAssets().open("tv-login.html"), 64 * 1024);
+                return template.replace("{{language}}", activity.getResources().getConfiguration().getLocales().get(0).toLanguageTag())
+                    .replace("{{translations}}", labels.toString().replace("<", "\\u003c"))
+                    .replace("{{public_key}}", JSONObject.quote(publicKey)).replace("{{path}}", path);
+            } catch (Exception error) {
+                throw new IllegalStateException("Phone login template unavailable", error);
+            }
         }
     }
 }

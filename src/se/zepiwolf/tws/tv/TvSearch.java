@@ -77,16 +77,16 @@ final class TvSearch {
         page.setPadding(dp(activity, 32), dp(activity, 20), dp(activity, 32), dp(activity, 20));
         page.setBackgroundColor(0xff111416);
         page.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-        TextView title = new TextView(activity); title.setText("搜索"); title.setTextSize(22); title.setTextColor(0xffeeeeee);
+        TextView title = new TextView(activity); title.setText(TvStrings.text(activity, "tv_search")); title.setTextSize(22); title.setTextColor(0xffeeeeee);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, dp(activity, 36));
         page.addView(title, titleParams);
         LinearLayout header = new LinearLayout(activity); header.setGravity(Gravity.CENTER_VERTICAL);
         page.addView(header, new LinearLayout.LayoutParams(-1, dp(activity, 64)));
         int backIcon = activity.getResources().getIdentifier("ic_arrow_back", "drawable", activity.getPackageName());
-        header.addView(icon("返回", backIcon != 0 ? backIcon : android.R.drawable.ic_media_previous, () -> back()), new LinearLayout.LayoutParams(dp(activity, 56), dp(activity, 56)));
+        header.addView(icon(TvStrings.text(activity, "tv_back"), backIcon != 0 ? backIcon : android.R.drawable.ic_media_previous, () -> back()), new LinearLayout.LayoutParams(dp(activity, 56), dp(activity, 56)));
         input = new SearchInput(activity); input.setId(View.generateViewId());
         input.setSingleLine(true); input.setTextSize(22); input.setTextColor(0xffeeeeee); input.setHintTextColor(0xffaeb8bc);
-        input.setHint("搜索标签或历史记录"); input.setPadding(dp(activity, 16), 0, dp(activity, 16), 0);
+        input.setHint(TvStrings.text(activity, "tv_search_hint")); input.setPadding(dp(activity, 16), 0, dp(activity, 16), 0);
         input.setInputType(originalInput.getInputType());
         input.setImeOptions(EditorInfo.IME_ACTION_SEARCH | EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_FLAG_NO_FULLSCREEN);
         input.setShowSoftInputOnFocus(false);
@@ -95,10 +95,10 @@ final class TvSearch {
         input.setOnClickListener(view -> showKeyboard());
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, dp(activity, 56), 1);
         inputParams.setMargins(dp(activity, 12), 0, dp(activity, 12), 0); header.addView(input, inputParams);
-        header.addView(icon("清空", android.R.drawable.ic_menu_close_clear_cancel, () -> {
+        header.addView(icon(TvStrings.text(activity, "tv_clear"), android.R.drawable.ic_menu_close_clear_cancel, () -> {
             input.setText(""); input.requestFocus();
         }), new LinearLayout.LayoutParams(dp(activity, 56), dp(activity, 56)));
-        submitButton = icon("搜索", android.R.drawable.ic_menu_search, () -> submit(input.getText().toString()));
+        submitButton = icon(TvStrings.text(activity, "tv_search"), android.R.drawable.ic_menu_search, () -> submit(input.getText().toString()));
         header.addView(submitButton, new LinearLayout.LayoutParams(dp(activity, 56), dp(activity, 56)));
         status = new TextView(activity); status.setTextSize(16); status.setTextColor(0xffb5bec2);
         status.setGravity(Gravity.CENTER_VERTICAL); page.addView(status, new LinearLayout.LayoutParams(-1, dp(activity, 36)));
@@ -226,7 +226,7 @@ final class TvSearch {
         int request = ++generation;
         if (pending != null) page.removeCallbacks(pending);
         submitButton.setEnabled(!query.trim().isEmpty());
-        status.setText("正在加载联想");
+        status.setText(TvStrings.text(activity, "tv_loading"));
         adapter.items = new ArrayList<>(); adapter.notifyDataSetChanged(); selectedPosition = 0;
         pending = () -> worker.execute(() -> {
             List<Suggestion> items = new ArrayList<>(); boolean failed = false;
@@ -259,7 +259,7 @@ final class TvSearch {
             page.post(() -> {
                 if (closed || request != generation) return;
                 adapter.items = items; adapter.notifyDataSetChanged();
-                status.setText(error ? "联想暂不可用" : items.isEmpty() ? "没有联想结果" : "联想（" + items.size() + "）");
+                status.setText(error ? TvStrings.text(activity, "tv_suggest_error") : items.isEmpty() ? TvStrings.text(activity, "tv_no_suggestions") : TvStrings.text(activity, "tv_suggestions", items.size()));
                 if (suggestions.hasFocus() && !items.isEmpty()) select(0);
             });
         });
@@ -273,7 +273,7 @@ final class TvSearch {
             originalInput.onEditorAction(EditorInfo.IME_ACTION_SEARCH);
         } catch (Exception error) {
             android.util.Log.w("TwsTV", "Search submission unavailable", error);
-            if (!closed) status.setText("搜索暂不可用");
+            if (!closed) status.setText(TvStrings.text(activity, "tv_search_error"));
         }
     }
     void close(boolean restoreFocus) {

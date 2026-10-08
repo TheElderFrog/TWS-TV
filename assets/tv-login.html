@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="{{language}}">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TWS TV login</title>
+<style>*{box-sizing:border-box}body{margin:0;background:#0d151e;color:#fff;font:17px system-ui}main{max-width:480px;margin:auto;padding:24px}h1{font-size:26px}label{display:block;margin:18px 0 6px}input,select,button{width:100%;padding:14px;font:inherit;border-radius:6px;border:1px solid #526775;background:#17212c;color:white}button{margin-top:24px;background:#216378}a{color:#73e3ff}p{line-height:1.5}</style>
+<main>
+<h1 data-i18n="tv_web_title">TWS TV login</h1>
+<label for="mode" data-i18n="tv_login_method">Login method</label>
+<select id="mode"><option value="password" data-i18n="tv_account_password">Account password</option><option value="api" data-i18n="tv_api_key">API key</option></select>
+<form id="form"><label for="user" data-i18n="tv_username">Username</label><input id="user" maxlength="30" autocomplete="username" required>
+<label id="secretLabel" for="secret" data-i18n="tv_password">Password</label><input id="secret" type="password" autocomplete="current-password" required>
+<button id="submit" data-i18n="tv_login_tv">Log in to TV</button></form>
+<p id="status" role="status"></p><p><a href="https://e621.net/api_keys" target="_blank" rel="noopener" data-i18n="tv_manage_api">Manage API keys</a></p>
+</main>
+<script src="{{path}}/crypto.js"></script>
+<script>
+const t = {{translations}};
+document.title = t.tv_web_title;
+document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t[el.dataset.i18n]);
+const mode = document.getElementById('mode'), secret = document.getElementById('secret'), user = document.getElementById('user'), button = document.getElementById('submit'), status = document.getElementById('status');
+mode.onchange = () => { secret.value = ''; document.getElementById('secretLabel').textContent = mode.value === 'api' ? t.tv_api_key : t.tv_password; secret.autocomplete = mode.value === 'api' ? 'off' : 'current-password'; };
+const rsa = new JSEncrypt(); rsa.setPublicKey({{public_key}});
+document.getElementById('form').onsubmit = async e => {
+    e.preventDefault(); button.disabled = true; status.textContent = t.tv_verifying;
+    try {
+        if (new TextEncoder().encode(user.value).length > 200 || new TextEncoder().encode(secret.value).length > 200) throw Error(t.tv_input_long);
+        const payload = {user: rsa.encrypt(user.value), secret: rsa.encrypt(secret.value), mode: mode.value}; secret.value = '';
+        if (!payload.user || !payload.secret) throw Error(t.tv_encrypt_error);
+        const response = await fetch(location.pathname, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+        const result = await response.json(); status.textContent = result.message;
+        if (result.ok) document.getElementById('form').hidden = true; else button.disabled = false;
+    } catch (error) { status.textContent = error.message === 'Failed to fetch' ? t.tv_phone_network : error.message; button.disabled = false; }
+};
+</script>
+</html>

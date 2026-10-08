@@ -1,6 +1,7 @@
 """Reproducible APK adaptation; preserves the original app's code and resource IDs."""
 from pathlib import Path
 import copy
+import json
 import shutil
 import sys
 import xml.etree.ElementTree as ET
@@ -17,6 +18,35 @@ def write(path, element):
     path.parent.mkdir(parents=True, exist_ok=True)
     ET.indent(element, space='    ')
     ET.ElementTree(element).write(path, encoding='utf-8', xml_declaration=True)
+
+# New strings are additive: original resource IDs and existing translations stay intact.
+catalog = json.loads((Path(__file__).parent / 'locales/strings.json').read_text(encoding='utf-8'))
+for qualifier, column in [('values', 1), ('values-zh', 0), ('values-zh-rCN', 0),
+                           ('values-zh-rTW', 2), ('values-zh-rHK', 2), ('values-b+zh+Hant', 2), ('values-ja', 3)]:
+    resources = ET.Element('resources')
+    for key, translations in catalog.items():
+        value = translations[column].replace('\\', '\\\\').replace('"', '\\"').replace("'", "\\'").replace('\n', '\\n')
+        ET.SubElement(resources, 'string', {'name': key}).text = '"' + value + '"'
+    write(root / 'res' / qualifier / 'tv_strings.xml', resources)
+locales = ET.Element('locale-config')
+for language in ['en', 'zh-Hans', 'zh-Hant', 'ja', 'cs', 'de', 'es', 'fr', 'it', 'ko', 'pl', 'pt-BR', 'ru', 'sv']:
+    ET.SubElement(locales, 'locale', {a('name'): language})
+write(root / 'res/xml/tv_locales.xml', locales)
+arrays_path = root / 'res/values/arrays.xml'
+arrays = ET.parse(arrays_path).getroot()
+for name, first, extra in [('languages', '@string/tv_system_language', ['繁體中文', '日本語']),
+                            ('languages_values', '', ['zh-TW', 'ja'])]:
+    array = next(el for el in arrays if el.get('name') == name)
+    item = ET.Element('item'); item.text = first; array.insert(0, item)
+    for text in extra:
+        ET.SubElement(array, 'item').text = text
+write(arrays_path, arrays)
+preferences_path = root / 'res/xml/preferences_general.xml'
+preferences = ET.parse(preferences_path).getroot()
+language = next(el for el in preferences.iter() if el.get(a('key')) == 'general_language')
+language.set(a('defaultValue'), '')
+language.set(p('defaultValue'), '')
+write(preferences_path, preferences)
 
 # Change only the runtime package string, not the original Java/resource namespace.
 for folder in ['smali', 'smali_classes2', 'res']:
@@ -40,10 +70,12 @@ app.set(a('name'), 'se.zepiwolf.tws.tv.TvApplication')
 app.set(a('banner'), '@drawable/tv_banner')
 app.set(a('extractNativeLibs'), 'true')
 app.set(a('label'), "The Wolf's Stash TV")
+app.set(a('localeConfig'), '@xml/tv_locales')
 # Local phone-login page works offline; credentials are encrypted before submission.
 assets = root / 'assets'
 assets.mkdir(exist_ok=True)
 shutil.copyfile(Path(__file__).parent / 'tools/jsencrypt-3.3.2.min.js', assets / 'tv-login-crypto.js')
+shutil.copyfile(Path(__file__).parent / 'assets/tv-login.html', assets / 'tv-login.html')
 for el in app.findall('activity'):
     if el.get(a('name'), '').startswith('se.zepiwolf.tws.'):
         el.set(a('screenOrientation'), 'landscape')
@@ -83,6 +115,8 @@ assert '.method public final m()J' in player and '.method public final r()J' in 
 assert '.method public final g()V' in controller, 'Controller hide method changed'
 search_view = (root / 'smali/androidx/appcompat/widget/SearchView.smali').read_text(encoding='utf-8')
 assert '.method public final r(Ljava/lang/CharSequence;)V' in search_view, 'Search query setter changed'
+assert '.method public static j(Le32;)V' in (root / 'smali/x8.smali').read_text(encoding='utf-8'), 'App locale setter changed'
+assert '.method public static a(Ljava/lang/String;)Le32;' in (root / 'smali/e32.smali').read_text(encoding='utf-8'), 'Locale list factory changed'
 
 # Home uses the existing toolbar, pager and bottom actions, plus a native side rail.
 home = ET.parse(root / 'res/layout/activity_main.xml').getroot()
@@ -100,12 +134,6 @@ for el in home.iter():
         el.set(a('clipToPadding'), 'true')
 frame = ET.Element('FrameLayout', {a('layout_width'): 'match_parent', a('layout_height'): 'match_parent'})
 frame.append(home)
-hint = ET.SubElement(frame, 'TextView', {
-    a('layout_width'): 'match_parent', a('layout_height'): '28dp', a('layout_gravity'): 'bottom',
-    a('layout_marginStart'): '172dp', a('layout_marginEnd'): '24dp', a('gravity'): 'center_vertical',
-    a('text'): '方向键选择  ·  确定打开  ·  长按确定查看操作  ·  菜单键快捷功能',
-    a('textSize'): '14sp', a('textColor'): '#9BAFBC', a('focusable'): 'false'
-})
 write(root / 'res/layout-land/activity_main.xml', frame)
 
 # Two panes retain the exact original view IDs and original action bar.
@@ -171,7 +199,7 @@ write(grid_path, grid)
 
 yaml = root / 'apktool.yml'
 text = yaml.read_text(encoding='utf-8')
-text = text.replace("versionCode: '172'", "versionCode: '176'").replace('versionCode: 172', 'versionCode: 176')
-text = text.replace('versionName: beta-4.16.4', 'versionName: beta-4.16.4-tv4')
+text = text.replace("versionCode: '172'", "versionCode: '177'").replace('versionCode: 172', 'versionCode: 177')
+text = text.replace('versionName: beta-4.16.4', 'versionName: beta-4.16.4-tv5')
 yaml.write_text(text, encoding='utf-8')
 print('Manifest, remote dispatch, home rail and two-pane viewer patched.')

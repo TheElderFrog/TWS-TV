@@ -274,13 +274,13 @@ public final class TvSupport {
             TextView title = new TextView(a); title.setText("TWS  TV"); title.setTextSize(21);
             title.setTextColor(0xff73e3ff); title.setGravity(Gravity.CENTER);
             rail.addView(title, new LinearLayout.LayoutParams(-1, dp(a, 54)));
-            button("图片", () -> focusImage());
-            button("搜索", () -> search());
-            button("已存搜索", () -> nav("saved_searches"));
-            button("筛选", () -> nav("filter"));
-            button("我的收藏", () -> nav("favourites"));
-            button("应用菜单", () -> click("btnMenu"));
-            button("遥控帮助", () -> help());
+            button(TvStrings.text(a, "tv_images"), () -> focusImage());
+            button(TvStrings.text(a, "tv_search"), () -> search());
+            button(TvStrings.text(a, "tv_saved"), () -> nav("saved_searches"));
+            button(TvStrings.text(a, "tv_filter"), () -> nav("filter"));
+            button(TvStrings.text(a, "tv_favourites"), () -> nav("favourites"));
+            button(TvStrings.text(a, "tv_app_menu"), () -> click("btnMenu"));
+            button(TvStrings.text(a, "tv_help"), () -> help());
             FrameLayout.LayoutParams p = new FrameLayout.LayoutParams(dp(a, 140), -1, Gravity.START);
             p.topMargin = dp(a, 16); p.bottomMargin = dp(a, 32); p.leftMargin = dp(a, 16);
             root.addView(rail, p);
@@ -288,6 +288,9 @@ public final class TvSupport {
         void button(String label, Runnable action) {
             Button b = new Button(a); b.setText(label); b.setTextSize(17); b.setTextColor(Color.WHITE); b.setAllCaps(false);
             b.setPadding(0, 0, 0, 0); b.setBackground(tile(false)); b.setFocusable(true);
+            b.setMaxLines(2);
+            if (android.os.Build.VERSION.SDK_INT >= 26)
+                b.setAutoSizeTextTypeUniformWithConfiguration(12, 17, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
             b.setOnFocusChangeListener((v, focused) -> b.setBackground(tile(focused)));
             b.setOnClickListener(v -> action.run());
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(a, 48)); p.bottomMargin = dp(a, 8);
@@ -295,7 +298,7 @@ public final class TvSupport {
         }
         void click(String n) {
             View v = findVisible(n); if (v != null) v.performClick();
-            else Toast.makeText(a, "此操作当前不可用", Toast.LENGTH_SHORT).show();
+            else Toast.makeText(a, TvStrings.text(a, "tv_unavailable"), Toast.LENGTH_SHORT).show();
         }
         void nav(String n) {
             View nav = a.findViewById(id(a, "bottom_nav"));
@@ -346,38 +349,38 @@ public final class TvSupport {
                     Object adapter = call(pager, "getAdapter", new Class<?>[0]);
                     int count = (Integer) call(adapter, "getItemCount", new Class<?>[0]);
                     if (index + delta >= 0 && index + delta < count) call(pager, "setCurrentItem", new Class<?>[]{int.class}, index + delta);
-                    else Toast.makeText(a, "已到当前页边界，可继续向下浏览加载", Toast.LENGTH_SHORT).show();
+                    else Toast.makeText(a, TvStrings.text(a, "tv_page_boundary"), Toast.LENGTH_SHORT).show();
                 }
             } catch (Exception ex) { android.util.Log.w("TwsTV", "Page unavailable", ex); }
         }
         void help() {
-            new AlertDialog.Builder(a).setTitle("TV 遥控操作")
-                .setMessage("图片网格：方向键移动，确定打开，长按确定查看原有图片操作。\n\n看图：左右切换；确定切换全屏；上下移动到详情/操作按钮；菜单键打开快捷操作。\n\n缩放模式：方向键移动图片，确定继续放大，返回退出缩放。\n\n菜单键可随时打开电视快捷菜单，搜索时确定键呼出键盘。所有账户、收藏、下载、筛选仍由原应用处理。")
-                .setPositiveButton("知道了", null).show();
+            new AlertDialog.Builder(a).setTitle(TvStrings.text(a, "tv_help_title"))
+                .setMessage(TvStrings.text(a, "tv_help_body"))
+                .setPositiveButton(TvStrings.text(a, "tv_ok"), null).show();
         }
         void menu() {
             List<String> labels = new ArrayList<>(); List<Runnable> actions = new ArrayList<>();
             if (post) {
-                add(labels, actions, "全屏 / 退出全屏", () -> toggleFullscreen());
+                add(labels, actions, TvStrings.text(a, "tv_fullscreen"), () -> toggleFullscreen());
                 if (findVisible("imgPlay") != null || findVisible("videoView") != null)
-                    add(labels, actions, "播放 / 暂停", () -> mediaAction(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
-                add(labels, actions, "上一张", () -> turnPost(-1));
-                add(labels, actions, "下一张", () -> turnPost(1));
+                    add(labels, actions, TvStrings.text(a, "tv_play_pause"), () -> mediaAction(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
+                add(labels, actions, TvStrings.text(a, "tv_previous_image"), () -> turnPost(-1));
+                add(labels, actions, TvStrings.text(a, "tv_next_image"), () -> turnPost(1));
                 if (viewer != null && !viewer.isVideo()) {
-                    add(labels, actions, "放大 / 移动图片", () -> zoom(1.5f));
-                    add(labels, actions, "缩小图片", () -> zoom(0.67f));
-                    add(labels, actions, "恢复图片比例", () -> resetZoom());
+                    add(labels, actions, TvStrings.text(a, "tv_zoom_pan"), () -> zoom(1.5f));
+                    add(labels, actions, TvStrings.text(a, "tv_zoom_out"), () -> zoom(0.67f));
+                    add(labels, actions, TvStrings.text(a, "tv_reset_zoom"), () -> resetZoom());
                 }
-                for (String[] action : new String[][]{{"收藏 / 取消收藏", "imgFavourite"}, {"下载图片", "imgDownload"}, {"查看评论", "imgComments"}, {"更多原有操作", "imgMore"}})
+                for (String[] action : new String[][]{{TvStrings.text(a, "tv_toggle_favourite"), "imgFavourite"}, {TvStrings.text(a, "tv_download"), "imgDownload"}, {TvStrings.text(a, "tv_comments"), "imgComments"}, {TvStrings.text(a, "tv_more"), "imgMore"}})
                     if (findVisible(action[1]) != null) add(labels, actions, action[0], () -> click(action[1]));
             } else if (home) {
-                add(labels, actions, "搜索", () -> search());
-                add(labels, actions, "上一页", () -> page(-1));
-                add(labels, actions, "下一页", () -> page(1));
-                add(labels, actions, "原应用菜单 / 设置", () -> click("btnMenu"));
+                add(labels, actions, TvStrings.text(a, "tv_search"), () -> search());
+                add(labels, actions, TvStrings.text(a, "tv_previous_page"), () -> page(-1));
+                add(labels, actions, TvStrings.text(a, "tv_next_page"), () -> page(1));
+                add(labels, actions, TvStrings.text(a, "tv_settings"), () -> click("btnMenu"));
             }
-            add(labels, actions, "遥控帮助", () -> help());
-            AlertDialog dialog = new AlertDialog.Builder(a).setTitle("电视快捷操作")
+            add(labels, actions, TvStrings.text(a, "tv_help"), () -> help());
+            AlertDialog dialog = new AlertDialog.Builder(a).setTitle(TvStrings.text(a, "tv_shortcuts"))
                 .setItems(labels.toArray(new String[0]), (d, index) -> actions.get(index).run()).create();
             dialog.setOnShowListener(d -> { dialog.getListView().setFocusable(true); dialog.getListView().requestFocus(); dialog.getListView().setSelection(0); });
             dialog.show();
@@ -389,13 +392,13 @@ public final class TvSupport {
             try {
                 float scale = (Float) call(v, "getScale", new Class<?>[0]);
                 PointF center = (PointF) call(v, "getCenter", new Class<?>[0]);
-                if (center == null) { Toast.makeText(a, "图片尚未加载完成", Toast.LENGTH_SHORT).show(); return; }
+                if (center == null) { Toast.makeText(a, TvStrings.text(a, "tv_not_loaded"), Toast.LENGTH_SHORT).show(); return; }
                 float min = (Float) call(v, "getMinScale", new Class<?>[0]);
                 float max = (Float) call(v, "getMaxScale", new Class<?>[0]);
                 call(v, "setScaleAndCenter", new Class<?>[]{float.class, PointF.class}, Math.max(min, Math.min(max, scale * factor)), center);
                 zoomMode = true; v.requestFocus();
-                Toast.makeText(a, "缩放模式：方向键移动，确定放大，返回退出", Toast.LENGTH_SHORT).show();
-            } catch (Exception ex) { Toast.makeText(a, "此媒体暂不支持遥控缩放，可使用原有查看功能", Toast.LENGTH_SHORT).show(); }
+                Toast.makeText(a, TvStrings.text(a, "tv_zoom_help"), Toast.LENGTH_SHORT).show();
+            } catch (Exception ex) { Toast.makeText(a, TvStrings.text(a, "tv_zoom_unsupported"), Toast.LENGTH_SHORT).show(); }
         }
         void resetZoom() {
             View v = image(); if (v == null) return;
@@ -434,7 +437,7 @@ public final class TvSupport {
                 return true;
             }
             if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_BUTTON_Y) { if (up) menu(); return true; }
-            if (zoomMode && code == KeyEvent.KEYCODE_BACK) { if (up) { zoomMode = false; Toast.makeText(a, "已退出缩放操作", Toast.LENGTH_SHORT).show(); } return true; }
+            if (zoomMode && code == KeyEvent.KEYCODE_BACK) { if (up) { zoomMode = false; Toast.makeText(a, TvStrings.text(a, "tv_zoom_exited"), Toast.LENGTH_SHORT).show(); } return true; }
             if (zoomMode && code >= 19 && code <= 22) { if (!up) pan(code); return true; }
             if (viewer != null && code == KeyEvent.KEYCODE_BACK && viewer.back(e)) return true;
             if (viewer != null && viewer.direction(e)) return true;

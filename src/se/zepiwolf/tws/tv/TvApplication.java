@@ -14,8 +14,19 @@ public final class TvApplication extends Application implements Application.Acti
             SharedPreferences.Editor e = p.edit();
             if (!p.contains("grid_width")) e.putInt("grid_width", 5);
             if (!p.contains("grid_height")) e.putInt("grid_height", 110);
-            if (!p.contains("general_language")) e.putString("general_language", "zh-CN");
             e.putBoolean("tv_defaults_v1", true).apply();
+        }
+        if (!p.getBoolean("tv_system_language_v1", false)) {
+            try {
+                Class<?> list = Class.forName("e32");
+                Object system = list.getMethod("a", String.class).invoke(null, "");
+                Class.forName("x8").getMethod("j", list).invoke(null, system);
+                getSharedPreferences(getPackageName() + "_preferences", MODE_PRIVATE)
+                    .edit().putString("general_language", "").apply();
+                p.edit().remove("general_language").putBoolean("tv_system_language_v1", true).apply();
+            } catch (Exception error) {
+                android.util.Log.e("TwsTV", "Could not restore system language", error);
+            }
         }
         registerActivityLifecycleCallbacks(this);
     }
