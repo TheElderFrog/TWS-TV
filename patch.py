@@ -118,20 +118,28 @@ assert '.method public final r(Ljava/lang/CharSequence;)V' in search_view, 'Sear
 assert '.method public static j(Le32;)V' in (root / 'smali/x8.smali').read_text(encoding='utf-8'), 'App locale setter changed'
 assert '.method public static a(Ljava/lang/String;)Le32;' in (root / 'smali/e32.smali').read_text(encoding='utf-8'), 'Locale list factory changed'
 
-# Home uses the existing toolbar, pager and bottom actions, plus a native side rail.
+# Original controls remain available to the native app; TV actions live in two rails.
+home_ids = ET.Element('resources')
+for name in ['query', 'search', 'saved', 'filter', 'favourites', 'images', 'app_menu', 'help', 'previous_page', 'next_page']:
+    ET.SubElement(home_ids, 'item', {'type': 'id', 'name': 'home_' + name})
+write(root / 'res/values/tv_home_ids.xml', home_ids)
 home = ET.parse(root / 'res/layout/activity_main.xml').getroot()
-home.set(a('layout_marginStart'), '168dp')
-home.set(a('layout_marginEnd'), '24dp')
-home.set(a('layout_marginTop'), '16dp')
-home.set(a('layout_marginBottom'), '36dp')
+home.set(a('layout_marginStart'), '164dp')
+home.set(a('layout_marginEnd'), '164dp')
+home.set(a('layout_marginTop'), '24dp')
+home.set(a('layout_marginBottom'), '24dp')
+home.set(a('background'), '#101213')
 for el in home.iter():
-    if el.get(a('id')) == '@id/toolbar':
-        el.attrib.pop(p('layout_scrollFlags'), None)
-    if el.get(a('id')) == '@id/bottom_nav':
+    if el.get(a('id')) in ('@id/app_bar', '@id/bottom_nav'):
+        el.set(a('visibility'), 'gone')
         el.attrib.pop(p('layout_behavior'), None)
     if el.get(a('id')) == '@id/lLText':
-        el.set(a('paddingBottom'), '64dp')
+        el.attrib.pop(p('layout_behavior'), None)
+        el.set(a('paddingBottom'), '0dp')
         el.set(a('clipToPadding'), 'true')
+    if el.get(a('id')) == '@id/swipeRefreshLayout':
+        el.set(a('layout_height'), '0dp')
+        el.set(a('layout_weight'), '1')
 frame = ET.Element('FrameLayout', {a('layout_width'): 'match_parent', a('layout_height'): 'match_parent'})
 frame.append(home)
 write(root / 'res/layout-land/activity_main.xml', frame)
@@ -199,7 +207,7 @@ write(grid_path, grid)
 
 yaml = root / 'apktool.yml'
 text = yaml.read_text(encoding='utf-8')
-text = text.replace("versionCode: '172'", "versionCode: '177'").replace('versionCode: 172', 'versionCode: 177')
-text = text.replace('versionName: beta-4.16.4', 'versionName: beta-4.16.4-tv5')
+text = text.replace("versionCode: '172'", "versionCode: '178'").replace('versionCode: 172', 'versionCode: 178')
+text = text.replace('versionName: beta-4.16.4', 'versionName: beta-4.16.4-tv6')
 yaml.write_text(text, encoding='utf-8')
 print('Manifest, remote dispatch, home rail and two-pane viewer patched.')

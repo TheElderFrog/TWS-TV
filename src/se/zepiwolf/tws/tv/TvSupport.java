@@ -5,24 +5,19 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -87,12 +82,6 @@ public final class TvSupport {
     static Object call(Object o, String method, Class<?>[] types, Object... args) throws Exception {
         return o.getClass().getMethod(method, types).invoke(o, args);
     }
-    private static GradientDrawable tile(boolean focus) {
-        GradientDrawable d = new GradientDrawable();
-        d.setColor(focus ? 0xff183d55 : 0xff17212c);
-        d.setCornerRadius(10); d.setStroke(focus ? 3 : 1, focus ? 0xff73e3ff : 0xff334454);
-        return d;
-    }
 
     private static final class Session implements ViewTreeObserver.OnGlobalLayoutListener, ViewTreeObserver.OnGlobalFocusChangeListener, ViewTreeObserver.OnPreDrawListener {
         final Activity a;
@@ -100,7 +89,7 @@ public final class TvSupport {
         final WeakHashMap<View, Boolean> configured = new WeakHashMap<>();
         ViewGroup root;
         FocusRing ring;
-        LinearLayout rail;
+        TvHome homeUi;
         TvLogin login;
         TvViewer viewer;
         TvSearch searchPage;
@@ -121,7 +110,12 @@ public final class TvSupport {
             root.getViewTreeObserver().addOnGlobalLayoutListener(this);
             root.getViewTreeObserver().addOnGlobalFocusChangeListener(this);
             root.getViewTreeObserver().addOnPreDrawListener(this);
-            if (home && root instanceof FrameLayout) addRail();
+            if (home && root instanceof FrameLayout) homeUi = new TvHome(a, root, new TvHome.Actions() {
+                @Override public void search() { Session.this.search(); }
+                @Override public void navigate(String item) { nav(item); }
+                @Override public void menu() { click("btnMenu"); }
+                @Override public void help() { Session.this.help(); }
+            });
             if (post) {
                 viewer = new TvViewer(a, root, new TvViewer.Actions() {
                     @Override public void page(int direction) { turnPost(direction); }
@@ -154,10 +148,15 @@ public final class TvSupport {
         }
         @Override public void onGlobalLayout() { update(); }
         @Override public boolean onPreDraw() {
+            if (homeUi != null && searchPage == null) homeUi.settleFocus();
             if (ring != null) ring.refresh();
             return true;
         }
         @Override public void onGlobalFocusChanged(View old, View current) {
+            if (homeUi != null && searchPage == null && homeUi.containerFocus(current)) {
+                homeUi.recoverGridFocus(current);
+                return;
+            }
             if (current != null && (searchPage == null || !searchPage.listFocus(current)) && (!post || (viewer != null && viewer.detailFocus(current)))) {
                 int margin = post ? dp(a, 4) : 0;
                 current.requestRectangleOnScreen(new Rect(-margin, -margin, current.getWidth() + margin, current.getHeight() + margin), false);
@@ -166,15 +165,7 @@ public final class TvSupport {
         }
         void update() {
             if (root == null) return;
-            if (home) {
-                View content = a.findViewById(id(a, "lLText"));
-                View bottom = a.findViewById(id(a, "bottom_nav"));
-                if (content != null && bottom != null && bottom.getHeight() > 0) {
-                    int padding = bottom.getHeight() + dp(a, 8);
-                    if (content.getPaddingBottom() != padding)
-                        content.setPadding(content.getPaddingLeft(), content.getPaddingTop(), content.getPaddingRight(), padding);
-                }
-            }
+            if (homeUi != null) homeUi.update();
             List<View> views = new ArrayList<>(); all(root, views);
             for (View v : views) {
                 String n = name(v);
@@ -190,7 +181,9 @@ public final class TvSupport {
                         v.setFocusable(true); v.setFocusableInTouchMode(true);
                     }
                     // One thumbnail is one remote stop; its info button remains available by long OK.
-                    if (home && n.equals("imgInfoBtn")) v.setFocusable(false);
+                    if (home && (n.equals("imgInfoBtn") || n.equals("btnMenu"))) {
+                        v.setFocusable(false); v.setFocusableInTouchMode(false);
+                    }
                     if (v instanceof EditText && (searchPage == null || !searchPage.owns(v))) ((EditText) v).setShowSoftInputOnFocus(false);
                     if (home && n.equals("search_src_text") && v instanceof android.widget.AutoCompleteTextView) {
                         android.widget.AutoCompleteTextView field = (android.widget.AutoCompleteTextView) v;
@@ -252,9 +245,9 @@ public final class TvSupport {
         }
         void focusImage() {
             if (searchPage != null) return;
+            if (homeUi != null) { homeUi.focusGrid(); return; }
             View v = image();
             if (v != null) v.requestFocus();
-            else if (home && rail != null && rail.getChildCount() > 1) rail.getChildAt(1).requestFocus();
         }
         boolean mediaAction(int code) {
             return viewer != null && viewer.mediaAction(code);
@@ -268,36 +261,10 @@ public final class TvSupport {
             a.onKeyUp(code, new KeyEvent(KeyEvent.ACTION_UP, code));
             main.postDelayed(() -> { update(); focusImage(); }, 250);
         }
-        void addRail() {
-            rail = new LinearLayout(a); rail.setOrientation(LinearLayout.VERTICAL);
-            rail.setPadding(dp(a, 8), dp(a, 12), dp(a, 8), dp(a, 10)); rail.setBackgroundColor(0xff0d151e);
-            TextView title = new TextView(a); title.setText("TWS  TV"); title.setTextSize(21);
-            title.setTextColor(0xff73e3ff); title.setGravity(Gravity.CENTER);
-            rail.addView(title, new LinearLayout.LayoutParams(-1, dp(a, 54)));
-            button(TvStrings.text(a, "tv_images"), () -> focusImage());
-            button(TvStrings.text(a, "tv_search"), () -> search());
-            button(TvStrings.text(a, "tv_saved"), () -> nav("saved_searches"));
-            button(TvStrings.text(a, "tv_filter"), () -> nav("filter"));
-            button(TvStrings.text(a, "tv_favourites"), () -> nav("favourites"));
-            button(TvStrings.text(a, "tv_app_menu"), () -> click("btnMenu"));
-            button(TvStrings.text(a, "tv_help"), () -> help());
-            FrameLayout.LayoutParams p = new FrameLayout.LayoutParams(dp(a, 140), -1, Gravity.START);
-            p.topMargin = dp(a, 16); p.bottomMargin = dp(a, 32); p.leftMargin = dp(a, 16);
-            root.addView(rail, p);
-        }
-        void button(String label, Runnable action) {
-            Button b = new Button(a); b.setText(label); b.setTextSize(17); b.setTextColor(Color.WHITE); b.setAllCaps(false);
-            b.setPadding(0, 0, 0, 0); b.setBackground(tile(false)); b.setFocusable(true);
-            b.setMaxLines(2);
-            if (android.os.Build.VERSION.SDK_INT >= 26)
-                b.setAutoSizeTextTypeUniformWithConfiguration(12, 17, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
-            b.setOnFocusChangeListener((v, focused) -> b.setBackground(tile(focused)));
-            b.setOnClickListener(v -> action.run());
-            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(a, 48)); p.bottomMargin = dp(a, 8);
-            rail.addView(b, p);
-        }
         void click(String n) {
-            View v = findVisible(n); if (v != null) v.performClick();
+            View v = findVisible(n);
+            if (v == null && home) v = a.findViewById(id(a, n));
+            if (v != null) v.performClick();
             else Toast.makeText(a, TvStrings.text(a, "tv_unavailable"), Toast.LENGTH_SHORT).show();
         }
         void nav(String n) {
@@ -323,23 +290,6 @@ public final class TvSupport {
                 });
                 ring.search = searchPage;
             }
-        }
-        boolean firstGridRow(View focus) {
-            if (focus == null || !name(focus).equals("imgPreview")) return false;
-            View child = focus;
-            while (child.getParent() instanceof ViewGroup) {
-                ViewGroup parent = (ViewGroup) child.getParent();
-                if (name(parent).equals("recyclerView")) {
-                    try {
-                        if (parent.getChildCount() == 0) return false;
-                        View first = parent.getChildAt(0);
-                        int firstPosition = (Integer) call(parent, "getChildAdapterPosition", new Class<?>[]{View.class}, first);
-                        return firstPosition == 0 && child.getTop() == first.getTop();
-                    } catch (Exception ex) { return !parent.canScrollVertically(-1); }
-                }
-                child = parent;
-            }
-            return false;
         }
         void page(int delta) {
             try {
@@ -425,17 +375,7 @@ public final class TvSupport {
                 if (!up && e.getRepeatCount() == 0) return mediaAction(code);
                 return findVisible("imgPlay") != null || findVisible("videoView") != null;
             }
-            if (home && code == KeyEvent.KEYCODE_DPAD_UP && firstGridRow(focus)) {
-                View input = searchInput();
-                if (input != null) {
-                    if (e.getAction() == KeyEvent.ACTION_DOWN) input.requestFocus();
-                    return true;
-                }
-            }
-            if (home && code == KeyEvent.KEYCODE_DPAD_DOWN && focus instanceof EditText && focus == searchInput()) {
-                if (e.getAction() == KeyEvent.ACTION_DOWN) focusImage();
-                return true;
-            }
+            if (homeUi != null && homeUi.direction(e)) return true;
             if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_BUTTON_Y) { if (up) menu(); return true; }
             if (zoomMode && code == KeyEvent.KEYCODE_BACK) { if (up) { zoomMode = false; Toast.makeText(a, TvStrings.text(a, "tv_zoom_exited"), Toast.LENGTH_SHORT).show(); } return true; }
             if (zoomMode && code >= 19 && code <= 22) { if (!up) pan(code); return true; }
@@ -490,6 +430,8 @@ public final class TvSupport {
             View focus = root.findFocus();
             if (focus == null || !focus.isShown() || !focus.getGlobalVisibleRect(rect)) return;
             if (search != null && search.listFocus(focus)) return;
+            if ("home_action".equals(focus.getTag())) return;
+            if (!post && TvHome.recycler(focus)) return;
             if (post && (viewer == null || !viewer.ringFocus(focus))) return;
             if ((long) rect.width() * rect.height() > (long) root.getWidth() * root.getHeight() * 85 / 100) return;
             int[] pos = new int[2]; getLocationOnScreen(pos);

@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Device)
+param([string]$Device = '192.168.31.194:5555')
 $ErrorActionPreference = 'Stop'
 $adb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
 $output = Join-Path $PSScriptRoot 'dist\viewer-tests'
@@ -94,11 +94,10 @@ $state = Snapshot 'video-exit'; CheckFull $state $false; CheckFocus $state 'vide
 
 $null = AdbCall @('shell','am','start','-n','se.zepiwolf.tws.tv/se.zepiwolf.tws.MainActivity')
 Start-Sleep -Seconds 3
-Key @(23)
 $state = Snapshot 'home'; CheckFocus $state 'imgPreview'
-Key @(19)
-$state = Snapshot 'home-search'; CheckFocus $state 'search_src_text'
-Key @(20)
+Key @(21)
+$state = Snapshot 'home-search'; CheckFocus $state 'home_search'
+Key @(22)
 $state = Snapshot 'home-return'; CheckFocus $state 'imgPreview'
 Screenshot 'home'
 Write-Output 'All TV viewer checks passed.'

@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Device)
+param([string]$Device = '192.168.31.194:5555')
 $ErrorActionPreference = 'Stop'
 $adb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
 $output = Join-Path $PSScriptRoot 'dist\search-tests'
@@ -47,9 +47,9 @@ function SelectedTitle($Xml) {
 # Only navigation and a safe-rated search; no account or content writes.
 $null = AdbCall @('shell','am','start','-S','-n','se.zepiwolf.tws.tv/se.zepiwolf.tws.MainActivity')
 Start-Sleep -Seconds 4
-Key @(23,19)
+Key @(21)
 $homeState = Snapshot 'home'
-$original = $homeState.SelectSingleNode('//node[contains(@resource-id, ":id/search_src_text")]').text
+$original = $homeState.SelectSingleNode('//node[contains(@resource-id, ":id/home_query")]').text
 Key @(23)
 Start-Sleep -Seconds 2
 CheckKeyboard $true
@@ -93,19 +93,19 @@ Key @(23)
 Start-Sleep -Seconds 3
 $result = Snapshot 'submitted'
 if (IsPage $result) { throw 'Submission did not leave search' }
-$query = $result.SelectSingleNode('//node[contains(@resource-id, ":id/search_src_text")]').text
+$query = $result.SelectSingleNode('//node[contains(@resource-id, ":id/home_query")]').text
 if ($query -ne $expectedQuery) { throw "Wrong submitted query: $query" }
 if ($result.SelectSingleNode('//node[@class="android.widget.ListView"]')) { throw 'Legacy suggestion popup returned' }
 CheckKeyboard $false
 Shot 'submitted'
-Key @(19,23)
+Key @(21,23)
 Start-Sleep -Seconds 2
 CheckKeyboard $true
 Key @(4,20,4)
 $cancel = Snapshot 'cancelled'
 if (IsPage $cancel) { throw 'Second Back did not return home' }
-if ($cancel.SelectSingleNode('//node[contains(@resource-id, ":id/search_src_text")]').text -ne $expectedQuery) { throw 'Cancel changed original query' }
-Key @(23)
+if ($cancel.SelectSingleNode('//node[contains(@resource-id, ":id/home_query")]').text -ne $expectedQuery) { throw 'Cancel changed original query' }
+Key @(21,23)
 Start-Sleep -Seconds 2
 Key @(4,23)
 Start-Sleep -Seconds 2
