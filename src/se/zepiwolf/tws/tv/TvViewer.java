@@ -133,10 +133,10 @@ final class TvViewer {
                 if (n.equals("txtDescription") && view instanceof TextView && ((TextView) view).isTextSelectable())
                     ((TextView) view).setTextIsSelectable(false);
                 boolean media = view == mediaTarget;
-                boolean textAction = view instanceof TextView && ((TextView) view).length() > 0;
                 boolean details = inside(view, owner) && ancestor(view, "scrollView") != null
                         && view.isClickable() && view.isEnabled()
-                        && (textAction || n.equals("pLLDescription") || n.equals("pLLTags"));
+                        && (view.hasOnClickListeners() || view instanceof TextView
+                            || n.equals("pLLDescription") || n.equals("pLLTags") || n.equals("pLLDetails"));
                 boolean action = inside(view, owner) && ancestor(view, "lLButtons") != null && view instanceof ImageButton;
                 boolean allowed = media || (!isFull() && (details || action));
                 if (view.isFocusable() != allowed) view.setFocusable(allowed);
@@ -288,7 +288,8 @@ final class TvViewer {
                 if (!isFull()) toggleFullscreen();
                 mediaAction(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
                 if (!preview) focusTransport();
-            } else toggleFullscreen();
+            } else if (isFull()) actions.zoom();
+            else toggleFullscreen();
         } else if (focus != null && Boolean.TRUE.equals(focusable.get(focus))) focus.performClick();
     }
     List<View> inZone(Zone zone) {
@@ -317,12 +318,15 @@ final class TvViewer {
         View focus = activity.getCurrentFocus(); Zone zone = zone(focus);
         if (zone == Zone.DETAILS) lastDetail = focus;
         if (zone == Zone.MEDIA) {
-            if (code == 21 || code == 22) {
-                if (isFull() && isVideo() && find("imgPlay") == null)
+            if (!isFull()) {
+                if (code == KeyEvent.KEYCODE_DPAD_LEFT && event.getRepeatCount() == 0) actions.page(-1);
+                else if (code == KeyEvent.KEYCODE_DPAD_RIGHT) focusDetails();
+                else if (code == KeyEvent.KEYCODE_DPAD_DOWN) focusActions();
+            } else if (code == 21 || code == 22) {
+                if (isVideo() && find("imgPlay") == null)
                     mediaAction(code == 21 ? KeyEvent.KEYCODE_MEDIA_REWIND : KeyEvent.KEYCODE_MEDIA_FAST_FORWARD);
                 else if (event.getRepeatCount() == 0) actions.page(code == 21 ? -1 : 1);
-            } else if (isFull()) focusTransport();
-            else if (code == 19) focusDetails(); else focusActions();
+            } else focusTransport();
         } else if (zone == Zone.TRANSPORT) {
             if (code == 19) hideTransport();
             else if (code == 21 || code == 22) move(transportButtons, focus, code == 21 ? -1 : 1);
@@ -331,10 +335,10 @@ final class TvViewer {
             else if (code == 21 || code == 22) move(inZone(Zone.ACTIONS), focus, code == 21 ? -1 : 1);
         } else {
             if (code == 21) focusMedia();
+            else if (code == 22 && event.getRepeatCount() == 0) actions.page(1);
             else if (code == 19 || code == 20) {
                 List<View> details = inZone(Zone.DETAILS); int index = details.indexOf(focus);
-                if (code == 19 && index <= 0) focusMedia();
-                else if (code == 20 && index == details.size() - 1) focusActions();
+                if (code == 20 && index == details.size() - 1) focusActions();
                 else move(details, focus, code == 19 ? -1 : 1);
             }
         }

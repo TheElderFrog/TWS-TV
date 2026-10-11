@@ -94,6 +94,9 @@ public final class TvSupport {
         TvViewer viewer;
         TvSearch searchPage;
         boolean attached, longCenter, zoomMode;
+        View zoomView, zoomOwner;
+        int zoomWidth, zoomHeight, zoomLevel;
+        boolean zoomFull, fitPending;
         Session(Activity a) {
             this.a = a;
             home = a.getClass().getSimpleName().equals("MainActivity");
@@ -119,7 +122,7 @@ public final class TvSupport {
             if (post) {
                 viewer = new TvViewer(a, root, new TvViewer.Actions() {
                     @Override public void page(int direction) { turnPost(direction); }
-                    @Override public void zoom() { Session.this.zoom(1.5f); }
+                    @Override public void zoom() { cycleZoom(); }
                 });
                 ring.viewer = viewer;
             }
@@ -149,6 +152,7 @@ public final class TvSupport {
         @Override public void onGlobalLayout() { update(); }
         @Override public boolean onPreDraw() {
             if (homeUi != null && searchPage == null) homeUi.settleFocus();
+            if (viewer != null) updateImageFit();
             if (ring != null) ring.refresh();
             return true;
         }
@@ -256,7 +260,7 @@ public final class TvSupport {
             if (viewer != null) viewer.toggleFullscreen();
         }
         void turnPost(int direction) {
-            zoomMode = false;
+            resetZoom();
             int code = direction < 0 ? KeyEvent.KEYCODE_DPAD_LEFT : KeyEvent.KEYCODE_DPAD_RIGHT;
             a.onKeyUp(code, new KeyEvent(KeyEvent.ACTION_UP, code));
             main.postDelayed(() -> { update(); focusImage(); }, 250);
@@ -346,14 +350,60 @@ public final class TvSupport {
                 float min = (Float) call(v, "getMinScale", new Class<?>[0]);
                 float max = (Float) call(v, "getMaxScale", new Class<?>[0]);
                 call(v, "setScaleAndCenter", new Class<?>[]{float.class, PointF.class}, Math.max(min, Math.min(max, scale * factor)), center);
-                zoomMode = true; v.requestFocus();
+                zoomMode = scale * factor > min * 1.01f; v.requestFocus();
                 Toast.makeText(a, TvStrings.text(a, "tv_zoom_help"), Toast.LENGTH_SHORT).show();
             } catch (Exception ex) { Toast.makeText(a, TvStrings.text(a, "tv_zoom_unsupported"), Toast.LENGTH_SHORT).show(); }
         }
         void resetZoom() {
             View v = image(); if (v == null) return;
             try { call(v, "resetScaleAndCenter", new Class<?>[0]); } catch (Exception ignored) {}
-            zoomMode = false;
+            zoomMode = false; zoomLevel = 0;
+        }
+        void updateImageFit() {
+            View v = viewer.media();
+            if (v == null || viewer.isVideo()) { zoomMode = false; zoomLevel = 0; return; }
+            boolean full = viewer.isFull();
+            if (v != zoomView || viewer.owner != zoomOwner || full != zoomFull
+                    || v.getWidth() != zoomWidth || v.getHeight() != zoomHeight) {
+                zoomView = v; zoomOwner = viewer.owner; zoomFull = full;
+                zoomWidth = v.getWidth(); zoomHeight = v.getHeight();
+                zoomMode = false; zoomLevel = 0; fitPending = true;
+            }
+            if (!fitPending || v.getWidth() <= 0 || v.getHeight() <= 0) return;
+            try {
+                if (!(Boolean) call(v, "isReady", new Class<?>[0])) return;
+                call(v, "setMinimumScaleType", new Class<?>[]{int.class}, 1);
+                float min = (Float) call(v, "getMinScale", new Class<?>[0]);
+                float max = (Float) call(v, "getMaxScale", new Class<?>[0]);
+                call(v, "setMaxScale", new Class<?>[]{float.class}, Math.max(max, min * 4));
+                call(v, "resetScaleAndCenter", new Class<?>[0]);
+                fitPending = false;
+                android.util.Log.i("TwsTV", "Image fit ready, full=" + full + ", scale=" + min);
+            } catch (Exception unsupported) {
+                if (v instanceof android.widget.ImageView)
+                    ((android.widget.ImageView) v).setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+                fitPending = false;
+            }
+        }
+        void cycleZoom() {
+            View v = viewer == null ? image() : viewer.media();
+            if (v == null) return;
+            try {
+                if (!(Boolean) call(v, "isReady", new Class<?>[0])) return;
+                float min = (Float) call(v, "getMinScale", new Class<?>[0]);
+                zoomLevel = (zoomLevel + 1) % 4;
+                float factor = zoomLevel == 0 ? 1 : zoomLevel + 1;
+                PointF center = zoomLevel == 0 ? null : (PointF) call(v, "getCenter", new Class<?>[0]);
+                if (center == null) center = new PointF(
+                        (Integer) call(v, "getSWidth", new Class<?>[0]) / 2f,
+                        (Integer) call(v, "getSHeight", new Class<?>[0]) / 2f);
+                call(v, "setScaleAndCenter", new Class<?>[]{float.class, PointF.class}, min * factor, center);
+                zoomMode = zoomLevel != 0; v.requestFocus();
+                android.util.Log.i("TwsTV", "Image zoom factor=" + factor + ", scale=" + min * factor);
+            } catch (Exception unsupported) {
+                zoomMode = false; zoomLevel = 0;
+                Toast.makeText(a, TvStrings.text(a, "tv_zoom_unsupported"), Toast.LENGTH_SHORT).show();
+            }
         }
         void pan(int code) {
             View v = image(); if (v == null) return;
@@ -377,7 +427,7 @@ public final class TvSupport {
             }
             if (homeUi != null && homeUi.direction(e)) return true;
             if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_BUTTON_Y) { if (up) menu(); return true; }
-            if (zoomMode && code == KeyEvent.KEYCODE_BACK) { if (up) { zoomMode = false; Toast.makeText(a, TvStrings.text(a, "tv_zoom_exited"), Toast.LENGTH_SHORT).show(); } return true; }
+            if (zoomMode && code == KeyEvent.KEYCODE_BACK) { if (up) resetZoom(); return true; }
             if (zoomMode && code >= 19 && code <= 22) { if (!up) pan(code); return true; }
             if (viewer != null && code == KeyEvent.KEYCODE_BACK && viewer.back(e)) return true;
             if (viewer != null && viewer.direction(e)) return true;
@@ -395,7 +445,7 @@ public final class TvSupport {
                         if (post) menu(); else if (focus != null && focus.isLongClickable()) focus.performLongClick(); else menu();
                     }
                 } else if (up && !longCenter) {
-                    if (zoomMode) zoom(1.4f);
+                    if (zoomMode) cycleZoom();
                     else if (viewer != null) viewer.activate(focus);
                     else if (focus != null && focus.isClickable()) focus.performClick();
                     else if (post) toggleFullscreen();

@@ -207,7 +207,7 @@ write(grid_path, grid)
 
 yaml = root / 'apktool.yml'
 text = yaml.read_text(encoding='utf-8')
-text = text.replace("versionCode: '172'", "versionCode: '178'").replace('versionCode: 172', 'versionCode: 178')
-text = text.replace('versionName: beta-4.16.4', 'versionName: beta-4.16.4-tv6')
+text = text.replace("versionCode: '172'", "versionCode: '180'").replace('versionCode: 172', 'versionCode: 180')
+text = text.replace('versionName: beta-4.16.4', 'versionName: beta-4.16.4-tv8')
 yaml.write_text(text, encoding='utf-8')
 print('Manifest, remote dispatch, home rail and two-pane viewer patched.')

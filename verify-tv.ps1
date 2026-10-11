@@ -51,7 +51,7 @@ $state = Snapshot 'actions'; CheckFocus $state 'imgFavourite'
 Screenshot 'actions'
 Key @(22)
 $state = Snapshot 'action-next'; CheckFocus $state 'imgComments'
-Key @(19,19)
+Key @(19,22)
 $state = Snapshot 'details-first'
 Key @(1..35 | ForEach-Object { 20 })
 $state = Snapshot 'details-scroll'
